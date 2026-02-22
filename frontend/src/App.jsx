@@ -1472,12 +1472,6 @@ function GovernancePage({ connections, DatabaseIcon }) {
     }
   }, [connections])
 
-  // Seeded random function based on table name
-  const seededRandom = (seed) => {
-    const x = Math.sin(seed) * 10000
-    return x - Math.floor(x)
-  }
-
   const loadGovernance = async (connectionId) => {
     setGovLoading(true)
     setGovError(null)
@@ -1503,19 +1497,7 @@ function GovernancePage({ connections, DatabaseIcon }) {
           const columns = colsRes.status === 'fulfilled' ? colsRes.value.data : []
 
           const rowCount = stats?.row_count || 0
-          const baseQuality = Math.max(50, 100 - Math.min(50, (stats?.null_count || 0) * 10))
-          
-          // Generate seeded random values based on table name
-          const tableKey = `${schema.name}.${table.name}`
-          const seed = Array.from(tableKey).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-          
-          // Add seeded variation to quality score
-          const qualityVariation = (seededRandom(seed) * 30) - 15 // -15 to +15
-          const qualityScore = Math.max(30, Math.min(100, baseQuality + qualityVariation))
-          
-          // Only 20% of tables get anomalies (1-3) - seeded
-          const hasAnomalies = seededRandom(seed * 2) < 0.2
-          const anomalies = hasAnomalies ? Math.floor(seededRandom(seed * 3) * 3 + 1) : 0
+          const qualityScore = Math.max(50, 100 - Math.min(50, (stats?.null_count || 0) * 10))
           
           const validationRules = [
             stats?.null_count ? 'Non-null checks' : null,
@@ -1535,38 +1517,8 @@ function GovernancePage({ connections, DatabaseIcon }) {
             columnCount: columns.length,
             validationRules: validationRules.length > 0 ? validationRules : ['Schema validation'],
             complianceStatus: qualityScore >= 75 ? 'Compliant' : qualityScore >= 60 ? 'At Risk' : 'Non-Compliant',
-            anomalies: anomalies
+            anomalies: 0
           })
-        }
-      }
-
-      // Assign very low quality (30-45) to 0-2 random tables based on seeded randomness
-      if (data.length > 0) {
-        // Determine count based on seeded random: 0, 1, or 2
-        const countSeed = Array.from(connectionId).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-        const countRandom = seededRandom(countSeed)
-        let lowQualityCount
-        if (countRandom < 0.33) {
-          lowQualityCount = 0
-        } else if (countRandom < 0.67) {
-          lowQualityCount = 1
-        } else {
-          lowQualityCount = 2
-        }
-        
-        // Sort by seeded hash to pick consistent "random" tables
-        const shuffledIndices = data.map((_, i) => i).sort((a, b) => {
-          const seedA = Array.from(`${data[a].schema}.${data[a].table}`).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-          const seedB = Array.from(`${data[b].schema}.${data[b].table}`).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-          return seededRandom(seedA * 4) - seededRandom(seedB * 4)
-        })
-        for (let i = 0; i < lowQualityCount && i < shuffledIndices.length; i++) {
-          const idx = shuffledIndices[i]
-          const tableKey = `${data[idx].schema}.${data[idx].table}`
-          const seed = Array.from(tableKey).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-          const lowQuality = Math.floor(seededRandom(seed * 5) * 46 + 25) // 25-70
-          data[idx].qualityScore = lowQuality
-          data[idx].complianceStatus = 'Non-Compliant'
         }
       }
 
